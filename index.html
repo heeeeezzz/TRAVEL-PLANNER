@@ -4,9 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ffffff">
+<meta name="description" content="희지가 만든 여행 플래너">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="여행 플래너">
 <title>TRAVEL PLANNER</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
 <link rel="stylesheet" href="style.css">
@@ -16,6 +22,18 @@
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
 </head>
 <body>
+<!-- 로딩 화면 -->
+<div id="splash">
+  <div class="splash-in">
+    <svg class="splash-plane" viewBox="0 0 512 512" aria-hidden="true">
+      <path d="M120 400 Q 170 300 250 300" stroke="#fff" stroke-opacity=".5" stroke-width="14" fill="none" stroke-linecap="round" stroke-dasharray="2 30"/>
+      <g transform="translate(20 -20) rotate(45 256 256)"><path fill="#fff" d="M256 104 c14 0 22 16 22 34 v82 l122 70 v30 l-122 -36 v78 l40 28 v22 l-62 -18 l-62 18 v-22 l40 -28 v-78 l-122 36 v-30 l122 -70 v-82 c0 -18 8 -34 22 -34 z"/></g>
+    </svg>
+    <div class="splash-title">TRAVEL PLANNER</div>
+    <div class="splash-by">made by 희지</div>
+  </div>
+</div>
+
 <!-- 여행 목록 -->
 <section id="home"></section>
 
@@ -58,6 +76,12 @@
 <script src="js/maps.js"></script>
 <script src="js/planner.js"></script>
 <script src="js/home.js"></script>
-<script>boot();</script>
+<script>
+  const splashStart = Date.now();
+  boot();
+  setTimeout(() => { const s = document.getElementById('splash'); s.classList.add('out'); setTimeout(() => s.remove(), 500); },
+    Math.max(0, 1300 - (Date.now() - splashStart)));
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
 </body>
 </html>

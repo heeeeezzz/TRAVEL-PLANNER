@@ -51,8 +51,9 @@ function renderHome() {
   const up = trips.filter(x => !x.st.past).sort((a, b) => a.st.order - b.st.order);
   const past = trips.filter(x => x.st.past).sort((a, b) => a.st.order - b.st.order);
   let h = `<div class="homehead">
-      <div class="brand">TRAVEL PLANNER</div>
+      <div class="brandwrap"><img src="icons/icon-192.png" alt=""><div><div class="brand">TRAVEL PLANNER</div><div class="brandby">made by 희지</div></div></div>
       <div class="row">
+        ${installEvt ? `<button onclick="installApp()">📲 앱 설치</button>` : ''}
         <button onclick="openGlobalSettings()" title="설정">⚙️ 설정</button>
         <label class="btnlike">⬆️ 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importTripFile(this.files[0]);this.value=''"></label>
         <button class="primary" onclick="openNewTrip()">＋ 새 여행</button>
@@ -72,6 +73,7 @@ function renderHome() {
         ${menuBtn(t.id)}</div>`;
     });
   }
+  h += `<div class="homefoot">✈️ TRAVEL PLANNER · made by 희지</div>`;
   $('#home').innerHTML = `<div class="homewrap">${h}</div>`;
   hydrate($('#home'));
 }
@@ -242,6 +244,17 @@ function saveApiKey() {
 function openGlobalSettings() {
   $('#modalBox').innerHTML = settingsKeyCard() + `<div class="row" style="justify-content:flex-end"><button onclick="closeModal()">닫기</button></div>`;
   openModal();
+}
+
+/* ---------- 홈 화면에 앱 설치 (크롬·삼성 인터넷) ---------- */
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (view === 'home') renderHome(); });
+window.addEventListener('appinstalled', () => { installEvt = null; toast('홈 화면에 앱을 추가했어요'); if (view === 'home') renderHome(); });
+async function installApp() {
+  if (!installEvt) { toast('브라우저 메뉴(⋮)에서 "홈 화면에 추가"를 눌러주세요'); return; }
+  installEvt.prompt();
+  try { await installEvt.userChoice; } catch (e) {}
+  installEvt = null; if (view === 'home') renderHome();
 }
 
 /* ---------- 시작 ---------- */

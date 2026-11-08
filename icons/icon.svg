@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#2563eb"/>
+<g transform="translate(256 256) scale(1.0) translate(-256 -256)"><path d="M120 400 Q 170 300 250 300" stroke="#ffffff" stroke-opacity=".45" stroke-width="14" fill="none" stroke-linecap="round" stroke-dasharray="2 30"/>
+<g transform="translate(20 -20) rotate(45 256 256)"><path d="M256 104 c14 0 22 16 22 34 v82 l122 70 v30 l-122 -36 v78 l40 28 v22 l-62 -18 l-62 18 v-22 l40 -28 v-78 l-122 36 v-30 l122 -70 v-82 c0 -18 8 -34 22 -34 z" fill="#ffffff"/></g></g></svg>
