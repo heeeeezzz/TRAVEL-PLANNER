@@ -18,7 +18,7 @@ function renderMap() {
     const d = dayOf(p.id);
     MapX.dot(p.lat, p.lng, {color:d >= 0 || p.cat === 'hotel' ? '#9aa3af' : CATS[p.cat].color, opacity:d >= 0 ? .6 : .9,
       html:`<b>${esc(p.name)}</b><br><span style="color:#6b7280">${p.cat === 'hotel' ? '숙소' : d >= 0 ? (d + 1) + '일차 일정' : '보관함 (일정 미배정)'}</span><br>
-      ${d < 0 && p.cat !== 'hotel' ? `<button onclick="addToDay('${p.id}',${ui.day})" style="margin-top:6px">${ui.day + 1}일차에 추가</button> ` : ''}<button onclick="openPlaceModal('${p.id}')" style="margin-top:6px">수정</button>`});
+      ${rw((d < 0 && p.cat !== 'hotel' ? `<button onclick="addToDay('${p.id}',${ui.day})" style="margin-top:6px">${ui.day + 1}일차에 추가</button> ` : '') + `<button onclick="openPlaceModal('${p.id}')" style="margin-top:6px">수정</button>`)}`});
   });
   c.rows.forEach(r => {
     if (r.legIn) {
@@ -47,7 +47,7 @@ function renderMap() {
     const p = r.p;
     if (r.role === 'stop') {
       n++;
-      addPin(p, n, CATS[p.cat].color, !!p.fixed, `<b>${esc(p.name)}</b><br>${fmt(r.start)} ~ ${fmt(r.depart)}${p.fixed ? '<br>🎫 ' + p.fixed + ' 고정' : ''}<br><button onclick="openPlaceModal('${p.id}')" style="margin-top:6px">수정</button>`, 20 + n);
+      addPin(p, n, CATS[p.cat].color, !!p.fixed, `<b>${esc(p.name)}</b><br>${fmt(r.start)} ~ ${fmt(r.depart)}${p.fixed ? '<br>🎫 ' + p.fixed + ' 고정' : ''}${rw(`<br><button onclick="openPlaceModal('${p.id}')" style="margin-top:6px">수정</button>`)}`, 20 + n);
     } else {
       addPin(p, CATS[p.cat].icon, CATS[p.cat].color, false, `<b>${esc(p.name)}</b><br>${r.role === 'start' ? '출발 ' + fmt(r.depart) : '도착 ' + fmt(r.arrive)}`, 6);
     }
@@ -113,7 +113,7 @@ function viewPlan() {
   const placeOpts = (sel, auto) => `<option value="auto" ${sel === 'auto' ? 'selected' : ''}>🔄 자동: ${auto ? esc(P(auto.placeId)?.name) : '숙소 없음'}</option><option value="" ${sel === '' ? 'selected' : ''}>없음</option>` +
     S.places.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${CATS[p.cat].icon} ${esc(p.name)}</option>`).join('');
   const unassigned = S.places.filter(p => dayOf(p.id) < 0 && !isTransportPlace(p) && p.cat !== 'hotel');
-  h += `<div class="card"><div class="grid2">
+  if (RO) h += roDayCard(di); else h += `<div class="card"><div class="grid2">
       <label class="f">출발 시각<input type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${day.start}" onchange="S.days[${di}].start=this.value;save();render(true)"></label>
       <label class="f">출발지<select onchange="S.days[${di}].startSel=this.value;save();render(true);ensureWalks()">${placeOpts(day.startSel, autoS)}</select></label>
       <label class="f">추가할 장소<select onchange="if(this.value){addToDay(this.value,${di})}"><option value="">보관함에서 선택…</option>${unassigned.map(p => `<option value="${p.id}">${CATS[p.cat].icon} ${esc(p.name)}</option>`).join('')}</select></label>
@@ -166,6 +166,7 @@ function viewPlan() {
   return h;
 }
 function ctrls(si, editJs, delTitle) {
+  if (RO) return '';
   return `<div class="ctrls"><button class="ghost" title="위로" onclick="moveStop(${si},-1)">▲</button><button class="ghost" title="아래로" onclick="moveStop(${si},1)">▼</button></div>
     <div class="ctrls"><button class="ghost" title="수정" onclick="${editJs}">✏️</button><button class="ghost" title="${delTitle}" onclick="removeStop(${si})">✕</button></div>`;
 }
@@ -186,6 +187,7 @@ function trRow(r) {
     ${ctrls(r.si, `openTransportModal('${tr.id}')`, '이 날 일정에서 빼기')}</div>`;
 }
 function legView(l) {
+  if (RO) return legViewRO(l);
   const gm = `https://www.google.com/maps/dir/?api=1&origin=${P(l.a).lat},${P(l.a).lng}&destination=${P(l.b).lat},${P(l.b).lng}&travelmode=${l.mode === 'walk' ? 'walking' : 'transit'}`;
   let detail;
   if (l.mode === 'walk') {
@@ -203,10 +205,22 @@ function legView(l) {
     <div class="row">${detail}</div></div>`;
 }
 
+/* ---------- 보기 전용(공유 화면)용 ---------- */
+const rw = html => RO ? '' : html;
+function roDayCard(di) {
+  const sp = startOf(di), ep = endOf(di), d = S.days[di];
+  return `<div class="card sub" style="font-size:13px">출발 <b style="color:var(--text)">${d.start}</b>${sp ? ' · ' + esc(P(sp)?.name || '') + '에서' : ''}${ep ? ' → ' + esc(P(ep)?.name || '') + '로' : ''}</div>`;
+}
+function legViewRO(l) {
+  const gm = `https://www.google.com/maps/dir/?api=1&origin=${P(l.a).lat},${P(l.a).lng}&destination=${P(l.b).lat},${P(l.b).lng}&travelmode=${l.mode === 'walk' ? 'walking' : 'transit'}`;
+  const t = l.mode === 'walk' ? `🚶 도보 ${dur(l.walkMin)} <span class="sub">${l.walkKm.toFixed(1)}km</span>` : `🚃 대중교통 ${dur(l.transitMin)}${l.transitReal ? '' : ' <span class="est">추정</span>'}`;
+  return `<div class="leg ${l.mode}"><div class="row"><span class="legmin">${t}</span><a class="gm" href="${gm}" target="_blank" rel="noopener">구글맵 경로 ↗</a></div></div>`;
+}
+
 /* ---------- 장소 탭 ---------- */
 function viewPlaces() {
   const g = MapX.kind === 'google' && !Search.googleBroken;
-  let h = `<div class="card"><div class="h2">장소 검색</div>
+  let h = RO ? '' : `<div class="card"><div class="h2">장소 검색</div>
     <input id="placeQ" placeholder="${g ? '예: 이치란 시부야, 스카이트리' : '예: 一蘭 渋谷, Shibuya Sky'}" style="width:100%" autocomplete="off" oninput="onPlaceInput(this.value)">
     <div id="placeRes"></div>
     <div class="sub" style="margin-top:6px">${g ? '한글로 검색해도 돼요. 지도에서 가게·관광지 아이콘을 눌러 추가할 수도 있어요 (📍 지도에서 추가를 켠 상태에서).' : '무료 검색이라 일본어·영어 이름이 더 잘 찾아져요. 설정에서 구글 API 키를 넣으면 한글 검색이 돼요.'}</div>
@@ -223,9 +237,9 @@ function viewPlaces() {
       h += `<div class="pitem"><span class="dot" style="background:${CATS[p.cat].color}"></span>
         <div style="flex:1;min-width:0"><div><b>${CATS[p.cat].icon} ${esc(p.name)}</b> ${p.rating ? `<span class="sub">★ ${p.rating.toFixed(1)}</span>` : ''}</div>
         <div class="sub">${CATS[p.cat].label}${p.stay ? ' · 체류 ' + dur(p.stay) : ''}${p.fixed ? ' · 🎫 ' + p.fixed : ''}${p.open || p.close ? ' · 영업 ' + (p.open || '?') + '~' + (p.close || '?') : p.hours ? ' · 영업시간 있음' : ''}</div></div>
-        ${addable ? `<select onchange="if(this.value!=='')addToDay('${p.id}',+this.value)" style="width:auto"><option value="">일정에 추가</option>${S.days.map((x, i) => `<option value="${i}">${i + 1}일차</option>`).join('')}</select>` : ''}
+        ${addable && !RO ? `<select onchange="if(this.value!=='')addToDay('${p.id}',+this.value)" style="width:auto"><option value="">일정에 추가</option>${S.days.map((x, i) => `<option value="${i}">${i + 1}일차</option>`).join('')}</select>` : ''}
         <button class="ghost" onclick="focusPlace('${p.id}')" title="지도에서 보기">🔍</button>
-        <button class="ghost" onclick="openPlaceModal('${p.id}')" title="수정">✏️</button></div>`;
+        ${rw(`<button class="ghost" onclick="openPlaceModal('${p.id}')" title="수정">✏️</button>`)}</div>`;
     });
     h += '</div></div>';
   });
@@ -365,7 +379,7 @@ function resolveEndpoint(name, picked, cat) {
 
 /* ---------- 교통편 탭 ---------- */
 function viewTrans() {
-  let h = `<div class="card"><div class="h2">예약 교통편</div>
+  let h = RO ? '' : `<div class="card"><div class="h2">예약 교통편</div>
     <div class="sub">항공편, 신칸센·특급열차, 고속버스처럼 시간이 정해진 교통편을 넣으면 일정에 고정 블록으로 들어가요. 출발 날짜에 맞는 일차에 시간 순서대로 자동 배치돼요.</div>
     <div class="row" style="margin-top:10px">
       <button class="primary" onclick="openTransportModal(null,'air')">✈️ 항공편 추가</button>
@@ -380,10 +394,10 @@ function viewTrans() {
     const over = daysBetween(tr.depDate, tr.arrDate || tr.depDate);
     h += `<div class="card" style="border-left:4px solid ${m.color};border-radius:0 var(--r) var(--r) 0">
       <div class="row between"><div><b>${m.icon} ${esc(tr.name || m.label)}</b> <span class="sub">${m.label}</span></div>
-        <div><button class="ghost" onclick="openTransportModal('${tr.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 교통편을 삭제할까요?',()=>delTransport('${tr.id}'))">🗑️</button></div></div>
+        <div>${rw(`<button class="ghost" onclick="openTransportModal('${tr.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 교통편을 삭제할까요?',()=>delTransport('${tr.id}'))">🗑️</button>`)}</div></div>
       <div class="route">${esc(a ? a.name : '?')} ${tr.depTime} → ${esc(b ? b.name : '?')} ${tr.arrTime}${over > 0 ? ` <span class="sub">(+${over}일)</span>` : ''}</div>
       <div class="sub">${shortDate(tr.depDate)} 출발 · 탑승 ${dur(toMin(tr.arrTime) + over * 1440 - toMin(tr.depTime))} · 출발 ${tr.bufDep}분 전 도착 / 내린 뒤 ${tr.bufArr}분 준비</div>
-      <div>${d >= 0 ? `<button class="tag fixed" onclick="ui.tab='plan';selDay(${d})">🗓️ ${d + 1}일차 일정에 들어있음</button>` : `<span class="tag late">일정에 없음 (여행 날짜 밖이거나 빼둠)</span> <button class="small" onclick="reTransport('${tr.id}')">다시 넣기</button>`}
+      <div>${d >= 0 ? `<button class="tag fixed" onclick="ui.tab='plan';selDay(${d})">🗓️ ${d + 1}일차 일정에 들어있음</button>` : `<span class="tag late">일정에 없음 (여행 날짜 밖이거나 빼둠)</span> ${rw(`<button class="small" onclick="reTransport('${tr.id}')">다시 넣기</button>`)}`}
         ${tr.seat ? `<span class="tag memo">💺 ${esc(tr.seat)}</span>` : ''}${tr.ref ? `<span class="tag memo">예약 ${esc(tr.ref)}</span>` : ''}${tr.memo ? `<span class="tag memo">${esc(tr.memo)}</span>` : ''}${vTag('t:' + tr.id)}</div>
     </div>`;
   });
@@ -447,7 +461,7 @@ function delTransport(id) {
 
 /* ---------- 숙소 탭 (+ 짐 배송) ---------- */
 function viewStay() {
-  let h = `<div class="card"><div class="h2">숙소</div>
+  let h = RO ? '' : `<div class="card"><div class="h2">숙소</div>
     <div class="sub">숙박 날짜를 넣으면 매일 출발지(전날 묵은 곳)와 도착지(그날 묵을 곳)가 일정에 자동으로 들어가요.</div>
     <button class="primary" style="margin-top:10px" onclick="openStayModal()">🏨 숙소 추가</button></div>`;
   if (S.trip.startDate && S.days.length > 1) {
@@ -463,18 +477,18 @@ function viewStay() {
     const p = P(s.placeId), nights = daysBetween(s.checkIn, s.checkOut);
     h += `<div class="card" style="border-left:4px solid ${CATS.hotel.color};border-radius:0 var(--r) var(--r) 0">
       <div class="row between"><b>🏨 ${esc(p ? p.name : '?')}</b>
-        <div><button class="ghost" onclick="focusStay('${s.id}')" title="지도">🔍</button><button class="ghost" onclick="openStayModal('${s.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 숙소를 삭제할까요?',()=>delStay('${s.id}'))">🗑️</button></div></div>
+        <div><button class="ghost" onclick="focusStay('${s.id}')" title="지도">🔍</button>${rw(`<button class="ghost" onclick="openStayModal('${s.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 숙소를 삭제할까요?',()=>delStay('${s.id}'))">🗑️</button>`)}</div></div>
       <div class="route" style="font-size:14px">${shortDate(s.checkIn)} ${s.inTime || ''} 체크인 → ${shortDate(s.checkOut)} ${s.outTime || ''} 체크아웃 <span class="sub">${nights}박</span></div>
       <div>${p && p.rating ? stars(p) : ''}${s.ref ? `<span class="tag memo">예약 ${esc(s.ref)}</span>` : ''}${s.memo ? `<span class="tag memo">${esc(s.memo)}</span>` : ''}${vTag('p:' + s.placeId)}</div>
     </div>`;
   });
   if (!list.length) h += '<div class="empty">아직 숙소가 없어요</div>';
-  h += `<div class="card"><div class="row between"><div class="h2" style="margin:0">🧳 짐 배송</div><button class="small primary" onclick="openLugModal()">+ 추가</button></div>
+  h += `<div class="card"><div class="row between"><div class="h2" style="margin:0">🧳 짐 배송</div>${rw(`<button class="small primary" onclick="openLugModal()">+ 추가</button>`)}</div>
     <div class="sub" style="margin-top:6px">맡기는 날 일정에 "짐 맡기기" 시간이 들어가고, 받는 숙소에 도착 예정 시각이 표시돼요.</div>`;
   S.luggage.slice().sort((a, b) => (a.dropDate + a.dropTime).localeCompare(b.dropDate + b.dropTime)).forEach(l => {
     h += `<div style="padding:10px 0;border-top:1px solid var(--line);margin-top:10px">
       <div class="row between"><b>${esc(P(l.from)?.name || '?')} → ${esc(P(l.to)?.name || '?')}</b>
-        <div><button class="ghost" onclick="openLugModal('${l.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 짐 배송을 삭제할까요?',()=>delLug('${l.id}'))">🗑️</button></div></div>
+        <div>${rw(`<button class="ghost" onclick="openLugModal('${l.id}')">✏️</button><button class="ghost" onclick="confirmBox('이 짐 배송을 삭제할까요?',()=>delLug('${l.id}'))">🗑️</button>`)}</div></div>
       <div class="sub">맡기기 ${shortDate(l.dropDate)} ${l.dropTime ? l.dropTime + ' 마감' : ''} (${l.dropMin || 0}분) · 도착 예정 ${shortDate(l.arrDate)} ${l.arrTime || ''}</div>
       <div>${l.company ? `<span class="tag memo">${esc(l.company)}</span>` : ''}${l.ref ? `<span class="tag memo">예약 ${esc(l.ref)}</span>` : ''}${l.fee ? `<span class="tag memo">${money(l.fee, l.cur)}</span>` : ''}${l.memo ? `<span class="tag memo">${esc(l.memo)}</span>` : ''}${vTag('l:' + l.id)}</div></div>`;
   });
@@ -675,15 +689,15 @@ function viewMoney() {
   const m = S.money, c = moneyCalc(), rate = +m.rate || 0;
   const pct = m.budget ? Math.min(100, c.total / m.budget * 100) : 0;
   let h = `<div class="card"><div class="grid2">
-      <label class="f">환율 (1엔 = ?원)<input type="number" step="0.01" value="${m.rate}" onchange="S.money.rate=+this.value;save();render(true)"></label>
-      <label class="f">총 예산 (원)<input type="number" value="${m.budget}" onchange="S.money.budget=+this.value;save();render(true)"></label></div>
+      <label class="f">환율 (1엔 = ?원)<input type="number" step="0.01" value="${m.rate}" ${RO ? 'disabled' : ''} onchange="S.money.rate=+this.value;save();render(true)"></label>
+      <label class="f">총 예산 (원)<input type="number" value="${m.budget}" ${RO ? 'disabled' : ''} onchange="S.money.budget=+this.value;save();render(true)"></label></div>
     <div class="summary" style="margin-top:10px">
       <div><span class="sub">총 지출</span><b>${won(c.total)}</b><span class="sub">${rate ? yen(c.total / rate) : ''}</span></div>
       <div><span class="sub">남은 예산</span><b style="color:${m.budget - c.total < 0 ? 'var(--warn)' : 'inherit'}">${won(m.budget - c.total)}</b></div></div>
     <div class="bar"><i class="${c.total > m.budget ? 'over' : ''}" style="width:${pct}%"></i></div>
     <div class="sub" style="margin-top:8px">${Object.entries(c.byCat).map(([k, v]) => `${k} ${won(v)}`).join(' · ') || '지출 없음'}</div>
   </div>`;
-  h += `<div class="card"><div class="h2">지출 추가</div>
+  if (!RO) h += `<div class="card"><div class="h2">지출 추가</div>
     <form onsubmit="event.preventDefault();addExpense(this)">
       <div class="grid2">
         <label class="f">항목<input name="title" required placeholder="예: 라멘"></label>
@@ -710,7 +724,7 @@ function viewMoney() {
       h += `<tr><td>${esc(it.title)}${it.lugId ? ' <span class="sub">🧳</span>' : ''}<div class="sub">${it.day < 0 ? '여행 전' : (it.day + 1) + '일차'} · ${it.cat}</div></td>
         <td>${esc(it.payer)}<div class="sub">${it.among.map(esc).join(', ')}</div></td>
         <td class="num">${money(it.amount, it.cur)}${it.cur === 'JPY' ? `<div class="sub">${won(c.krw(it))}</div>` : ''}</td>
-        <td><button class="ghost" onclick="delExpense('${it.id}')">✕</button></td></tr>`;
+        <td>${rw(`<button class="ghost" onclick="delExpense('${it.id}')">✕</button>`)}</td></tr>`;
     });
     h += '</table>';
   }
@@ -723,15 +737,15 @@ function viewCheck() {
   const cats = [...new Set(L.map(x => x.cat))];
   let h = `<div class="card"><div class="row between"><div class="h2" style="margin:0">준비물</div><span class="sub">${done} / ${L.length}</span></div>
     <div class="bar"><i style="width:${L.length ? done / L.length * 100 : 0}%;background:var(--ok)"></i></div>
-    <form class="row" style="margin-top:10px" onsubmit="event.preventDefault();addCheck(this)">
+    ${rw(`<form class="row" style="margin-top:10px" onsubmit="event.preventDefault();addCheck(this)">
       <input name="text" placeholder="추가할 준비물" style="flex:1" required>
       <input name="cat" list="chkcats" placeholder="분류" style="width:90px" value="${esc(cats[0] || '기타')}">
       <datalist id="chkcats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-      <button class="primary">추가</button></form></div>`;
+      <button class="primary">추가</button></form>`)}</div>`;
   cats.forEach(cat => {
     h += `<div class="card"><div class="h2">${esc(cat)}</div>`;
     L.filter(x => x.cat === cat).forEach(x => {
-      h += `<div class="chk ${x.done ? 'done' : ''}"><input type="checkbox" ${x.done ? 'checked' : ''} onchange="toggleCheck('${x.id}')"><span>${esc(x.text)}</span><button class="ghost" onclick="delCheck('${x.id}')">✕</button></div>`;
+      h += `<div class="chk ${x.done ? 'done' : ''}"><input type="checkbox" ${x.done ? 'checked' : ''} ${RO ? 'disabled' : ''} onchange="toggleCheck('${x.id}')"><span>${esc(x.text)}</span>${rw(`<button class="ghost" onclick="delCheck('${x.id}')">✕</button>`)}</div>`;
     });
     h += '</div>';
   });
@@ -748,7 +762,8 @@ function viewSettings() {
       <label class="f">돌아오는 날<input type="date" value="${end}" onchange="setTripDates(null,this.value)"></label>
     </div>
     <label class="f" style="margin-top:8px">동행자 (쉼표로 구분)<input value="${esc(S.members.join(', '))}" onchange="S.members=this.value.split(',').map(s=>s.trim()).filter(Boolean);if(!S.members.length)S.members=['나'];save();render(true)"></label>
-    <div class="row" style="margin-top:10px"><button onclick="openTripEdit('${S.id}')">🖼️ 대표 사진 바꾸기</button></div>
+    <div class="row" style="margin-top:10px"><button onclick="openTripEdit('${S.id}')">🖼️ 대표 사진 바꾸기</button>
+      <button onclick="shareTrip('${S.id}')">🔗 ${S.share ? '공유 링크 보기' : '공유 링크 만들기'}</button></div>
   </div>
   ${settingsKeyCard()}
   <div class="card"><div class="h2">이 여행 데이터</div>

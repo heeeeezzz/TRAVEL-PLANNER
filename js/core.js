@@ -240,7 +240,8 @@ function migrate(s) {
 
 /* ---------- 현재 열려 있는 여행 ---------- */
 let S = null;
-function save() { if (S) { storeTrip(S); if (typeof Sync !== 'undefined') Sync.schedule(); } }
+let RO = false;   // 공유 화면(보기 전용)일 때 true — 저장 안 함
+function save() { if (S && !RO) { storeTrip(S); if (typeof Sync !== 'undefined') Sync.schedule(); } }
 const P = id => S.places.find(p => p.id === id);
 const T = id => S.transports.find(t => t.id === id);
 function syncDays() {

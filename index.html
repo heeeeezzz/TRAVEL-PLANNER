@@ -40,7 +40,7 @@
 <!-- 플래너 -->
 <section id="planner" style="display:none">
   <header>
-    <button class="ghost" onclick="goHome()" title="여행 목록">← 목록</button>
+    <button class="ghost" id="backBtn" onclick="goHome()" title="여행 목록">← 목록</button>
     <h1 id="tripTitle">여행</h1>
     <button class="syncchip" style="margin-left:auto" onclick="Sync.tap()">☁️</button>
     <nav id="nav">
@@ -54,6 +54,7 @@
       <button data-tab="settings">⚙️ 설정</button>
     </nav>
   </header>
+  <div id="shareBar" style="display:none"></div>
   <main>
     <section id="panel"></section>
     <section id="mapwrap">

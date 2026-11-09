@@ -7,10 +7,11 @@
 
 const MapX = {
   kind:null, el:null, clickCb:null,
-  async init(el, onClick) {
+  async init(el, onClick, keyOverride) {
     this.el = el; this.clickCb = onClick;
-    if (G.apiKey) {
-      try { await GoogleMap.init(el); this.kind = 'google'; return; }
+    const key = keyOverride != null ? keyOverride : G.apiKey;
+    if (key) {
+      try { await GoogleMap.init(el, key); this.kind = 'google'; return; }
       catch (e) { console.warn(e); toast('구글 지도를 불러오지 못해서 무료 지도로 보여드려요. 설정에서 API 키를 확인하세요.'); }
     }
     if (FreeMap.init(el)) this.kind = 'free';
@@ -38,7 +39,7 @@ const MapX = {
 /* ---------- 구글 지도 ---------- */
 const GoogleMap = {
   map:null, objs:[], iw:null, lib:{},
-  load() {
+  load(key) {
     if (window.google && google.maps && google.maps.importLibrary) return Promise.resolve();
     return new Promise((res, rej) => {
       window.__gmReady = () => res();
@@ -47,14 +48,14 @@ const GoogleMap = {
         MapX.fallback(); Search.googleBroken = true;
       };
       const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(G.apiKey)}&v=weekly&language=ko&loading=async&callback=__gmReady`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=ko&loading=async&callback=__gmReady`;
       s.async = true; s.onerror = () => rej(new Error('google maps script failed'));
       document.head.appendChild(s);
       setTimeout(() => rej(new Error('google maps timeout')), 15000);
     });
   },
-  async init(el) {
-    await this.load();
+  async init(el, key) {
+    await this.load(key);
     const {Map, InfoWindow} = await google.maps.importLibrary('maps');
     const {Marker} = await google.maps.importLibrary('marker');
     this.lib = {Map, InfoWindow, Marker};

@@ -15,10 +15,13 @@ function confirmBox(msg, cb) {
 
 /* ---------- 화면 전환 (주소 #trip-아이디) ---------- */
 function route() {
+  const sh = location.hash.match(/^#share-([A-Za-z0-9_-]+)$/);
+  if (RO && !sh) { location.reload(); return; }   // 공유 화면에서 나갈 땐 새로 시작
+  if (sh) { openShared(sh[1]); return; }
   const m = location.hash.match(/^#trip-([a-z0-9]+)$/);
   if (m && tripIds().includes(m[1])) openPlanner(m[1]); else showHome();
 }
-function goHome() { if (location.hash) location.hash = ''; else showHome(); }
+function goHome() { if (RO) { location.href = location.pathname; return; } if (location.hash) location.hash = ''; else showHome(); }
 function goTrip(id) { location.hash = 'trip-' + id; }
 function showHome() {
   view = 'home'; S = null; closeModal();
@@ -89,13 +92,14 @@ function tripCard(t, st) {
     </div>
     <div class="tbody"><div class="tname">${esc(t.trip.name)}</div>
       <div class="sub">${range}</div>
-      <div class="tcount"><span>📍 ${places}곳</span>${t.transports.length ? `<span>🚄 ${t.transports.length}편</span>` : ''}<span>👥 ${t.members.length}명</span></div>
+      <div class="tcount">${t.share ? '<span>🔗 공유 중</span>' : ''}<span>📍 ${places}곳</span>${t.transports.length ? `<span>🚄 ${t.transports.length}편</span>` : ''}<span>👥 ${t.members.length}명</span></div>
     </div></div>`;
 }
 function menuBtn(id) {
   return `<div class="menuwrap" onclick="event.stopPropagation()"><button class="ghost dots" onclick="toggleMenu(this)">⋯</button>
     <div class="menu">
       <div onclick="openTripEdit('${id}')">✏️ 이름·사진 바꾸기</div>
+      <div onclick="shareTrip('${id}')">🔗 공유 링크</div>
       <div onclick="openNewTrip('${id}')">📄 복제해서 새 여행</div>
       <div onclick="exportTrip('${id}')">⬇️ 내보내기</div>
       <div class="danger" onclick="confirmBox('이 여행을 삭제할까요? 되돌릴 수 없어요.',()=>deleteTrip('${id}'))">🗑️ 삭제</div>
@@ -193,7 +197,7 @@ async function saveTripEdit(id) {
 /* ---------- 삭제·내보내기·불러오기 ---------- */
 async function deleteTrip(id, fromPlanner) {
   const t = loadTrip(id); if (!t) return;
-  syncNoteDeleted(id, t.sample);
+  syncNoteDeleted(id, t.sample, t.share && t.share.fileId);
   const fids = [t.coverFid].concat(...t.vouchers.map(v => v.files.map(f => f.fid))).filter(Boolean);
   for (const fid of fids) { try { await DB.del(fid); } catch (e) {} }
   LS.del('tp.trip.' + id); setTripIds(tripIds().filter(x => x !== id));

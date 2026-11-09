@@ -11,6 +11,7 @@ const GOOGLE_CLIENT_ID = '505716812414-r44m58q5s9mennj6j8uknn2q2tveje3j.apps.goo
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DAPI = 'https://www.googleapis.com/drive/v3';
 const UAPI = 'https://www.googleapis.com/upload/drive/v3';
+const SHARE_KEY = 'AIzaSyCTSlgltmC8BEnTAtq9r7TH2yrDq9LA6hU';   // 공유 화면에서 드라이브 읽기 전용 (Drive API만 허용된 키)
 
 const Sync = {
   state:'off',      // off | idle | syncing | error | login(다시 로그인 필요)
@@ -150,6 +151,8 @@ const Sync = {
     // 1) 이 기기에서 지운 여행 → 드라이브 휴지통
     for (const id of tomb) { if (rById[id]) { await this.trash(rById[id].id); delete rById[id]; } delete map[id]; }
     LS.set('tp.deleted', []);
+    for (const fid of LS.get('tp.deletedShares') || []) { try { await this.trash(fid); } catch (e) { if (e.login) throw e; } }
+    LS.set('tp.deletedShares', []);
 
     // 2) 이 기기에 있는 여행
     for (const id of localIds) {
@@ -172,6 +175,15 @@ const Sync = {
       await this.pullTrip(r); map[id] = +r.appProperties.updated || 0; result.downloaded.push(id);
     }
     LS.set('tp.syncmap', map);
+
+    // 공유 링크가 있는 여행은 공유용 파일도 최신으로
+    const smap = LS.get('tp.sharemap') || {};
+    for (const id of tripIds()) {
+      const t = loadTrip(id); if (!t || t.sample || !t.share || !t.share.fileId || smap[id] === t.updated) continue;
+      try { await this.upload(t.share.fileId, shareMeta(t), JSON.stringify(shareSnapshot(t)), 'application/json'); smap[id] = t.updated; }
+      catch (e) { if (e.login) throw e; if (/drive 404/.test(e.message)) { t.share = null; LS.set('tp.trip.' + id, t); } else throw e; }
+    }
+    LS.set('tp.sharemap', smap);
 
     // 4) 파일(바우처·대표 사진) 맞추기
     const rFiles = await this.list(`'${G.filesFolderId}' in parents and trashed=false`);
@@ -216,13 +228,15 @@ async function removeTripLocal(id) {
   LS.del('tp.trip.' + id); setTripIds(tripIds().filter(x => x !== id));
 }
 // 여행을 지울 때 (home.js에서 호출)
-function syncNoteDeleted(id, wasSample) {
+function syncNoteDeleted(id, wasSample, shareFileId) {
+  if (shareFileId) { const ds = LS.get('tp.deletedShares') || []; ds.push(shareFileId); LS.set('tp.deletedShares', ds); }
   if (!Sync.on() || wasSample) return;
   const tomb = LS.get('tp.deleted') || []; if (!tomb.includes(id)) tomb.push(id); LS.set('tp.deleted', tomb);
   Sync.schedule(500);
 }
 // 동기화로 데이터가 바뀌었을 때 화면 갱신
 function afterSyncChanged(r) {
+  if (RO) return;
   if (view === 'home') { renderHome(); return; }
   if (view === 'planner' && S) {
     if (r.removed.includes(S.id)) { toast('이 여행은 다른 기기에서 삭제됐어요'); goHome(); return; }
@@ -256,3 +270,121 @@ const syncChip = () => `<button class="syncchip" onclick="event.stopPropagation(
 // 자동 동기화 시점: 인터넷 다시 연결 / 앱으로 돌아왔을 때
 window.addEventListener('online', () => Sync.schedule(500));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') Sync.schedule(800); });
+
+/* =========================================================
+   공유 링크 (보기 전용)
+   - 드라이브에 공유용 파일(바우처·대표 사진 제외)을 따로 만들고 "링크가 있는 사람 보기"로 공개
+   - 원본 여행·바우처 파일은 계속 비공개
+   - 동기화할 때마다 공유용 파일도 최신으로 갱신
+   ========================================================= */
+function shareSnapshot(t) {
+  const c = JSON.parse(JSON.stringify(t));
+  c.vouchers = []; c.coverFid = ''; delete c.sample;
+  const key = (t.share && t.share.mapsKey) || G.apiKey || '';
+  delete c.share;
+  c._share = {owner:'희지', mapsKey:key, at:Date.now()};
+  return c;
+}
+function shareMeta(t) { return {name:'공유-' + (t.trip.name || '여행').replace(/[\\/:*?"<>|]/g, '_') + '.json', mimeType:'application/json', appProperties:{tpShare:t.id}}; }
+function shareUrl(t) { return location.origin + location.pathname + '#share-' + t.share.fileId; }
+async function shareTrip(id) {
+  closeModal();
+  let t = loadTrip(id); if (!t) return;
+  if (t.sample) { toast('샘플 여행은 공유할 수 없어요. 새 여행을 만들어서 공유해 주세요'); return; }
+  if (t.share && t.share.fileId) { openShareModal(id); return; }
+  if (!Sync.on() || !Sync.tokenOk()) {
+    toast('공유 링크는 드라이브에 만들어져요. 먼저 구글 로그인을 해주세요');
+    if (!(await Sync.login())) return;
+  }
+  toast('공유 링크를 만드는 중이에요…');
+  try {
+    await Sync.ensureFolders(); t = loadTrip(id);
+    const fid = await Sync.upload(null, {...shareMeta(t), parents:[G.folderId]}, JSON.stringify(shareSnapshot(t)), 'application/json');
+    await Sync.req(`${DAPI}/files/${fid}/permissions`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({role:'reader', type:'anyone'})});
+    t.share = {fileId:fid, at:Date.now(), mapsKey:G.apiKey || ''};
+    storeTrip(t);
+    const smap = LS.get('tp.sharemap') || {}; delete smap[id]; LS.set('tp.sharemap', smap);
+    if (S && S.id === id) { S.share = t.share; S.updated = t.updated; }
+    Sync.schedule(1500);
+    openShareModal(id);
+    if (view === 'home') renderHome();
+  } catch (e) {
+    console.warn(e);
+    if (e && e.login) { Sync.setState('login'); toast('로그인이 풀렸어요. ⚠️ 다시 로그인 후 한 번 더 눌러주세요'); }
+    else toast('공유 링크를 만들지 못했어요. 잠시 뒤 다시 해주세요');
+  }
+}
+function openShareModal(id) {
+  const t = S && S.id === id ? S : loadTrip(id), url = shareUrl(t);
+  $('#modalBox').innerHTML = `<div class="h2">🔗 공유 링크</div>
+    <div class="sub" style="line-height:1.6;margin-bottom:10px">이 링크를 받은 사람은 <b>보기만</b> 할 수 있어요. 로그인도 필요 없어요.<br>
+    희지님이 일정을 고치면 동기화될 때 공유 화면에도 자동으로 반영돼요. 바우처와 대표 사진은 공유되지 않아요.</div>
+    <input id="shareUrlIn" value="${esc(url)}" readonly style="width:100%" onclick="this.select()">
+    <div class="row" style="margin-top:10px">
+      <button class="primary" onclick="copyShare()">📋 링크 복사</button>
+      ${navigator.share ? `<button onclick="navigator.share({title:${esc(JSON.stringify(t.trip.name))},text:'희지가 공유한 여행 일정이에요 ✈️',url:$('#shareUrlIn').value}).catch(()=>{})">📤 카톡 등으로 보내기</button>` : ''}
+    </div>
+    <div class="row between" style="margin-top:16px">
+      <button class="danger" onclick="confirmBox('공유를 중지할까요? 보낸 링크로는 더 이상 볼 수 없어요.',()=>stopShare('${id}'))">공유 중지</button>
+      <button onclick="closeModal()">닫기</button>
+    </div>`;
+  openModal();
+}
+async function copyShare() {
+  const v = $('#shareUrlIn').value;
+  try { await navigator.clipboard.writeText(v); toast('링크를 복사했어요'); }
+  catch (e) { $('#shareUrlIn').select(); document.execCommand && document.execCommand('copy'); toast('링크를 복사했어요'); }
+}
+async function stopShare(id) {
+  const t = loadTrip(id); if (!t || !t.share) return;
+  const fid = t.share.fileId;
+  try { await Sync.trash(fid); }
+  catch (e) { const ds = LS.get('tp.deletedShares') || []; ds.push(fid); LS.set('tp.deletedShares', ds); }   // 다음 동기화 때 다시 시도
+  t.share = null; storeTrip(t);
+  if (S && S.id === id) { S.share = null; S.updated = t.updated; }
+  Sync.schedule(1500); toast('공유를 중지했어요');
+  if (view === 'home') renderHome(); else render(true);
+}
+
+/* ---------- 공유받은 사람의 보기 전용 화면 ---------- */
+async function openShared(fid) {
+  RO = true; view = 'planner'; document.body.classList.add('ro'); closeModal();
+  $('#home').style.display = 'none'; $('#planner').style.display = '';
+  $('#tripTitle').textContent = '불러오는 중…'; $('#panel').innerHTML = '<div class="empty">공유받은 여행을 불러오는 중이에요…</div>';
+  $('#backBtn').textContent = '← 내 플래너';
+  let data;
+  try {
+    const r = await fetch(`${DAPI}/files/${fid}?alt=media&key=${SHARE_KEY}`);
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+  } catch (e) {
+    $('#tripTitle').textContent = '공유받은 여행';
+    $('#panel').innerHTML = `<div class="empty">여행을 불러오지 못했어요.<br>공유가 중지됐거나 링크가 잘못됐을 수 있어요.</div>`;
+    $('#shareBar').style.display = 'none'; return;
+  }
+  S = migrate(data); S._shareFile = fid;
+  Object.assign(ui, {tab:'plan', day:0, addMode:false, results:[], fit:true});
+  const owner = (S._share && S._share.owner) || '친구';
+  $('#shareBar').innerHTML = `<span>👀 <b>${esc(owner)}</b>님이 공유한 여행 · 보기 전용</span><button class="small" onclick="copySharedTrip()">📥 내 앱에 사본 저장</button>`;
+  $('#shareBar').style.display = '';
+  document.title = (S.trip.name || '여행') + ' · 공유받은 여행';
+  render();
+  if (!mapInited) { mapInited = true; await MapX.init($('#map'), () => {}, (S._share && S._share.mapsKey) || ''); ui.fit = true; render(); }
+}
+async function refreshShared() {
+  if (!RO || !S || !S._shareFile) return;
+  try {
+    const r = await fetch(`${DAPI}/files/${S._shareFile}?alt=media&key=${SHARE_KEY}`); if (!r.ok) return;
+    const d = migrate(await r.json());
+    if ((d.updated || 0) !== (S.updated || 0)) { const f = S._shareFile; S = d; S._shareFile = f; render(true); toast('최신 일정으로 바뀌었어요'); }
+  } catch (e) {}
+}
+function copySharedTrip() {
+  const t = JSON.parse(JSON.stringify(S));
+  delete t._share; delete t._shareFile; delete t.share;
+  t.id = uid(); t.created = Date.now(); t.sample = false; t.vouchers = [];
+  storeTrip(t); setTripIds([t.id].concat(tripIds()));
+  toast('내 플래너에 사본을 저장했어요');
+  setTimeout(() => { location.hash = 'trip-' + t.id; location.reload(); }, 600);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshShared(); });

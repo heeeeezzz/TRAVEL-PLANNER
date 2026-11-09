@@ -38,6 +38,8 @@ input.bad{border-color:var(--warn);background:var(--warn-soft)}
 .syncchip{font-size:12.5px;padding:5px 10px;border-radius:999px;white-space:nowrap}
 .syncchip.on{background:var(--ok-soft);border-color:#b7e4d2;color:#065f46}
 .syncchip.warn{background:var(--wait-soft);border-color:#f5d39b;color:var(--wait)}
+body.ro #nav [data-tab=vouch], body.ro #nav [data-tab=settings], body.ro .syncchip, body.ro #btnAddMode, body.ro #addhint{display:none!important}
+#shareBar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#eef4ff;color:#1e3a8a;padding:8px 14px;font-size:13px;border-bottom:1px solid var(--line)}
 .homefoot{text-align:center;color:var(--sub);font-size:12px;margin-top:36px}
 #home{min-height:100%;overflow-y:auto}
 .homewrap{max-width:980px;margin:0 auto;padding:22px 18px 40px}
