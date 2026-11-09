@@ -114,7 +114,7 @@ function viewPlan() {
     S.places.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${CATS[p.cat].icon} ${esc(p.name)}</option>`).join('');
   const unassigned = S.places.filter(p => dayOf(p.id) < 0 && !isTransportPlace(p) && p.cat !== 'hotel');
   h += `<div class="card"><div class="grid2">
-      <label class="f">출발 시각<input type="time" value="${day.start}" onchange="S.days[${di}].start=this.value;save();render(true)"></label>
+      <label class="f">출발 시각<input type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${day.start}" onchange="S.days[${di}].start=this.value;save();render(true)"></label>
       <label class="f">출발지<select onchange="S.days[${di}].startSel=this.value;save();render(true);ensureWalks()">${placeOpts(day.startSel, autoS)}</select></label>
       <label class="f">추가할 장소<select onchange="if(this.value){addToDay(this.value,${di})}"><option value="">보관함에서 선택…</option>${unassigned.map(p => `<option value="${p.id}">${CATS[p.cat].icon} ${esc(p.name)}</option>`).join('')}</select></label>
       <label class="f">도착지<select onchange="S.days[${di}].endSel=this.value;save();render(true);ensureWalks()">${placeOpts(day.endSel, autoE)}</select></label>
@@ -282,10 +282,10 @@ function openPlaceModal(id, init = {}, fromMap) {
     <div class="grid2" style="margin-top:8px">
       <label class="f">분류<select name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${k === p.cat ? 'selected' : ''}>${v.icon} ${v.label}</option>`).join('')}</select></label>
       <label class="f">체류 시간 (분)<input name="stay" type="number" min="0" step="5" value="${p.stay}"></label>
-      <label class="f">🎫 고정 방문 시각<input name="fixed" type="time" value="${p.fixed}"></label>
+      <label class="f">🎫 고정 방문 시각<input name="fixed" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${p.fixed}"></label>
       <label class="f" style="justify-content:flex-end"><span class="row" style="gap:6px;color:var(--text)"><input name="ticket" type="checkbox" ${p.ticket ? 'checked' : ''}> 티켓 구매함</span></label>
-      <label class="f">영업 시작${p.hours ? ' (비우면 구글 정보)' : ''}<input name="open" type="time" value="${p.open}"></label>
-      <label class="f">영업 종료${p.hours ? ' (비우면 구글 정보)' : ''}<input name="close" type="time" value="${p.close}"></label>
+      <label class="f">영업 시작${p.hours ? ' (비우면 구글 정보)' : ''}<input name="open" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${p.open}"></label>
+      <label class="f">영업 종료${p.hours ? ' (비우면 구글 정보)' : ''}<input name="close" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${p.close}"></label>
     </div>
     <label class="f" style="margin-top:8px">메모<textarea name="memo" rows="2">${esc(p.memo)}</textarea></label>
     <div class="sub" style="margin-top:6px">${p.hours ? '영업시간은 구글 정보로 방문하는 날 요일에 맞춰 자동으로 계산돼요. ' : ''}고정 시각을 넣으면 그 시간에 맞춰 일정이 짜이고, 앞 일정의 여유시간이 표시돼요.</div>
@@ -406,9 +406,9 @@ function openTransportModal(id, mode) {
     <div class="sub" style="margin-top:4px">목록에 없으면 이름을 쓰고 🔍로 검색해서 고르세요.</div>
     <div class="grid2" style="margin-top:8px">
       <label class="f">출발 날짜<input name="depDate" type="date" value="${tr.depDate}" required onchange="if(!this.form.arrDate.value)this.form.arrDate.value=this.value"></label>
-      <label class="f">출발 시각<input name="depTime" type="time" value="${tr.depTime}" required></label>
+      <label class="f">출발 시각<input name="depTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${tr.depTime}" required></label>
       <label class="f">도착 날짜<input name="arrDate" type="date" value="${tr.arrDate || tr.depDate}"></label>
-      <label class="f">도착 시각<input name="arrTime" type="time" value="${tr.arrTime}" required></label>
+      <label class="f">도착 시각<input name="arrTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${tr.arrTime}" required></label>
       <label class="f">출발 몇 분 전까지 도착<input name="bufDep" type="number" min="0" step="5" value="${tr.bufDep}"></label>
       <label class="f">내린 뒤 준비 시간 (분)<input name="bufArr" type="number" min="0" step="5" value="${tr.bufArr}"></label>
       <label class="f">예약번호<input name="ref" value="${esc(tr.ref)}"></label>
@@ -494,9 +494,9 @@ function openStayModal(id) {
     ${epField('stform', 'hotel', '숙소 이름', '이름을 쓰고 🔍로 위치를 찾으세요', P(s.placeId)?.name || '', 'htlist')}
     <div class="grid2" style="margin-top:8px">
       <label class="f">체크인 날짜<input name="checkIn" type="date" value="${s.checkIn}" required></label>
-      <label class="f">체크인 시각<input name="inTime" type="time" value="${s.inTime}"></label>
+      <label class="f">체크인 시각<input name="inTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${s.inTime}"></label>
       <label class="f">체크아웃 날짜<input name="checkOut" type="date" value="${s.checkOut}" required></label>
-      <label class="f">체크아웃 시각<input name="outTime" type="time" value="${s.outTime}"></label>
+      <label class="f">체크아웃 시각<input name="outTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${s.outTime}"></label>
       <label class="f">예약번호<input name="ref" value="${esc(s.ref)}"></label>
       <label class="f">메모<input name="memo" value="${esc(s.memo)}" placeholder="예: 조식 포함"></label>
     </div>
@@ -530,14 +530,14 @@ function openLugModal(id) {
     <label class="f">맡기는 곳<select name="from" required>${opts(l.from)}</select></label>
     <div class="grid2" style="margin-top:8px">
       <label class="f">맡기는 날<input name="dropDate" type="date" value="${l.dropDate}" required></label>
-      <label class="f">맡기기 마감 시각<input name="dropTime" type="time" value="${l.dropTime}"></label>
+      <label class="f">맡기기 마감 시각<input name="dropTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${l.dropTime}"></label>
       <label class="f">맡기는 데 걸리는 시간 (분)<input name="dropMin" type="number" min="0" step="5" value="${l.dropMin}"></label>
       <span></span>
     </div>
     <label class="f" style="margin-top:8px">받는 곳<select name="to" required>${opts(l.to)}</select></label>
     <div class="grid2" style="margin-top:8px">
       <label class="f">도착 예정 날짜<input name="arrDate" type="date" value="${l.arrDate}" required></label>
-      <label class="f">도착 예정 시각<input name="arrTime" type="time" value="${l.arrTime}"></label>
+      <label class="f">도착 예정 시각<input name="arrTime" type="text" inputmode="numeric" class="tinput" placeholder="예: 930" autocomplete="off" maxlength="12" value="${l.arrTime}"></label>
       <label class="f">업체<input name="company" value="${esc(l.company)}"></label>
       <label class="f">예약번호<input name="ref" value="${esc(l.ref)}"></label>
       <label class="f">요금<input name="fee" type="number" step="any" value="${l.fee}"></label>

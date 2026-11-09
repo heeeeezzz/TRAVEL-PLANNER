@@ -60,6 +60,41 @@ function hav(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+/* 시간 입력: "930" "1430" "9" "14:30" "9시 30분" "오후 3시" → "HH:MM" / 빈칸 → "" / 잘못된 값 → null */
+function parseTime(s) {
+  s = String(s ?? '').trim(); if (!s) return '';
+  let pm = /오후|pm/i.test(s), am = /오전|am/i.test(s), h, m = 0, x;
+  s = s.replace(/오전|오후|am|pm/ig, '').trim();
+  if ((x = s.match(/^(\d{1,2})\s*시\s*(?:(\d{1,2})\s*분?)?$/))) { h = +x[1]; m = +(x[2] || 0); }
+  else if ((x = s.match(/^(\d{1,2})\s*[:.;\s]\s*(\d{1,2})$/))) { h = +x[1]; m = +x[2]; }
+  else if (/^\d{1,4}$/.test(s)) {
+    if (s.length <= 2) h = +s;
+    else if (s.length === 3) { h = +s[0]; m = +s.slice(1); }
+    else { h = +s.slice(0, 2); m = +s.slice(2); }
+  } else return null;
+  if (pm && h < 12) h += 12; if (am && h === 12) h = 0;
+  if (h > 23 || m > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+// 시간 칸(.tinput)은 값이 바뀌거나 저장하기 전에 자동으로 정리
+if (typeof document !== 'undefined') {
+  const fix = el => {
+    const v = parseTime(el.value);
+    if (v === null) { el.classList.add('bad'); return false; }
+    el.classList.remove('bad'); el.value = v; return true;
+  };
+  document.addEventListener('change', e => {
+    if (e.target.classList && e.target.classList.contains('tinput') && !fix(e.target)) {
+      e.stopImmediatePropagation(); toast('시간을 다시 확인해 주세요 (예: 930, 14:30)');
+    }
+  }, true);
+  document.addEventListener('submit', e => {
+    const bad = [...e.target.querySelectorAll('.tinput')].filter(el => !fix(el));
+    if (bad.length) { e.preventDefault(); e.stopImmediatePropagation(); bad[0].focus(); toast('시간을 다시 확인해 주세요 (예: 930, 14:30)'); }
+  }, true);
+  document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('tinput')) e.target.classList.remove('bad'); }, true);
+}
+
 function toast(msg) { const t = typeof document !== 'undefined' && $('#toast'); if (!t) return; t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000); }
 
 /* 추정식 (조정 가능)
@@ -205,7 +240,7 @@ function migrate(s) {
 
 /* ---------- 현재 열려 있는 여행 ---------- */
 let S = null;
-function save() { if (S) storeTrip(S); }
+function save() { if (S) { storeTrip(S); if (typeof Sync !== 'undefined') Sync.schedule(); } }
 const P = id => S.places.find(p => p.id === id);
 const T = id => S.transports.find(t => t.id === id);
 function syncDays() {

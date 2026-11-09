@@ -32,7 +32,7 @@ async function openPlanner(id) {
   Object.assign(ui, {tab:'plan', day:0, addMode:false, results:[], fit:true});
   $('#home').style.display = 'none'; $('#planner').style.display = '';
   document.title = (S.trip.name || '여행') + ' · TRAVEL PLANNER';
-  render();
+  render(); updateSyncChips();
   if (!mapInited) { mapInited = true; await MapX.init($('#map'), mapClicked); ui.fit = true; if (S) render(); }
   ensureWalks();
 }
@@ -53,12 +53,14 @@ function renderHome() {
   let h = `<div class="homehead">
       <div class="brandwrap"><img src="icons/icon-192.png" alt=""><div><div class="brand">TRAVEL PLANNER</div><div class="brandby">made by 희지</div></div></div>
       <div class="row">
+        ${syncChip()}
         ${installEvt ? `<button onclick="installApp()">📲 앱 설치</button>` : ''}
         <button onclick="openGlobalSettings()" title="설정">⚙️ 설정</button>
         <label class="btnlike">⬆️ 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importTripFile(this.files[0]);this.value=''"></label>
         <button class="primary" onclick="openNewTrip()">＋ 새 여행</button>
       </div></div>`;
   if (!G.apiKey) h += `<div class="notice">🔑 구글 API 키를 넣으면 한글 장소 검색과 한국어 지도를 쓸 수 있어요. <button class="small" onclick="openGlobalSettings()">키 넣기</button></div>`;
+  if (!G.syncOn) h += `<div class="notice">☁️ 구글 드라이브 동기화를 켜면 폰과 PC에서 같은 여행을 보고 고칠 수 있어요. <button class="small" onclick="Sync.login()">켜기</button></div>`;
   h += `<div class="sec">다가오는 여행</div><div class="cards">`;
   up.forEach(({t, st}) => { h += tripCard(t, st); });
   h += `<div class="tcard newcard" onclick="openNewTrip()"><div style="font-size:26px">＋</div>새 여행 만들기</div></div>`;
@@ -155,7 +157,7 @@ async function createTrip() {
   const file = f.cover.files[0];
   if (file) { try { const fid = uid(); await DB.put(fid, file); t.coverFid = fid; } catch (e) { toast('사진 저장에 실패했어요'); } }
   syncDaysOf(t); storeTrip(t);
-  setTripIds([t.id].concat(tripIds()));
+  setTripIds([t.id].concat(tripIds())); Sync.schedule(1500);
   closeModal(); goTrip(t.id);
   toast('새 여행을 만들었어요. 장소 탭에서 가고 싶은 곳부터 넣어보세요');
 }
@@ -183,7 +185,7 @@ async function saveTripEdit(id) {
   if (f.rm && f.rm.checked && t.coverFid) { try { await DB.del(t.coverFid); } catch (e) {} t.coverFid = ''; }
   const file = f.cover.files[0];
   if (file) { try { if (t.coverFid) await DB.del(t.coverFid); const fid = uid(); await DB.put(fid, file); t.coverFid = fid; } catch (e) { toast('사진 저장에 실패했어요'); } }
-  storeTrip(t); closeModal();
+  storeTrip(t); closeModal(); Sync.schedule(1500);
   if (view === 'home') renderHome(); else render(true);
   toast('저장했어요');
 }
@@ -191,6 +193,7 @@ async function saveTripEdit(id) {
 /* ---------- 삭제·내보내기·불러오기 ---------- */
 async function deleteTrip(id, fromPlanner) {
   const t = loadTrip(id); if (!t) return;
+  syncNoteDeleted(id, t.sample);
   const fids = [t.coverFid].concat(...t.vouchers.map(v => v.files.map(f => f.fid))).filter(Boolean);
   for (const fid of fids) { try { await DB.del(fid); } catch (e) {} }
   LS.del('tp.trip.' + id); setTripIds(tripIds().filter(x => x !== id));
@@ -217,7 +220,7 @@ function importTripFile(file) {
       const t = migrate(d); delete t.sample;
       if (tripIds().includes(t.id)) t.id = uid();
       if (!t.trip.name) t.trip.name = '불러온 여행';
-      storeTrip(t); setTripIds([t.id].concat(tripIds()));
+      storeTrip(t); setTripIds([t.id].concat(tripIds())); Sync.schedule(1500);
       renderHome(); toast(`'${t.trip.name}'을(를) 불러왔어요`);
     } catch (e) { toast('올바른 여행 파일이 아니에요'); }
   };
@@ -272,4 +275,5 @@ function boot() {
   $('#btnFit').onclick = () => { ui.fit = true; renderMap(); };
   window.addEventListener('hashchange', route);
   route();
+  if (G.syncOn) { if (Sync.tokenOk()) Sync.syncNow(); else Sync.setState('login'); }
 }

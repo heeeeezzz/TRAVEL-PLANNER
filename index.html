@@ -42,6 +42,7 @@
   <header>
     <button class="ghost" onclick="goHome()" title="여행 목록">← 목록</button>
     <h1 id="tripTitle">여행</h1>
+    <button class="syncchip" style="margin-left:auto" onclick="Sync.tap()">☁️</button>
     <nav id="nav">
       <button data-tab="plan">🗓️ 일정</button>
       <button data-tab="places">📍 장소</button>
@@ -75,6 +76,7 @@
 <script src="js/core.js"></script>
 <script src="js/maps.js"></script>
 <script src="js/planner.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/home.js"></script>
 <script>
   const splashStart = Date.now();
